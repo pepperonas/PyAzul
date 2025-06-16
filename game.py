@@ -384,6 +384,9 @@ class AzulGUI:
 
 		# Spiel initialisieren
 		self.game = AzulGame(self.num_players)
+		
+		# Spielernamen
+		self.player_names = [f"Spieler {i+1}" for i in range(self.num_players)]
 
 		# GUI-Variablen
 		self.selected_factory = None
@@ -520,9 +523,12 @@ class AzulGUI:
 		header = tk.Frame(frame, bg="#3A3C4B")
 		header.pack(fill=tk.X, padx=5, pady=5)
 
-		name_label = tk.Label(header, text=f"Spieler {player_idx + 1}",
-		                      bg="#3A3C4B", fg="white", font=("Arial", 12, "bold"))
-		name_label.pack(side=tk.LEFT)
+		name_entry = tk.Entry(header, width=12, font=("Arial", 12, "bold"),
+		                      bg="#4A4C5B", fg="white", insertbackground="white")
+		name_entry.insert(0, f"Spieler {player_idx + 1}")
+		name_entry.bind('<Return>', lambda e: self._update_player_name(player_idx, name_entry.get()))
+		name_entry.bind('<FocusOut>', lambda e: self._update_player_name(player_idx, name_entry.get()))
+		name_entry.pack(side=tk.LEFT)
 
 		score_label = tk.Label(header, text="0 Punkte",
 		                       bg="#3A3C4B", fg="#FFD700", font=("Arial", 12))
@@ -565,11 +571,18 @@ class AzulGUI:
 
 		return {
 			"frame": frame,
+			"name_entry": name_entry,
 			"score_label": score_label,
 			"pattern_canvases": pattern_canvases,
 			"wall_canvas": wall_canvas,
 			"floor_canvas": floor_canvas
 		}
+
+	def _update_player_name(self, player_idx, new_name):
+		"""Aktualisiert den Namen eines Spielers"""
+		if new_name.strip():
+			self.player_names[player_idx] = new_name.strip()
+			self._update_display()
 
 	def _draw_tile(self, canvas, x, y, color: TileColor, size=25):
 		"""Zeichnet eine einzelne Fliese"""
@@ -581,7 +594,8 @@ class AzulGUI:
 		# Phase und aktueller Spieler
 		self.phase_label.config(text=f"Phase: {self.game.phase.value}")
 		if self.game.phase == GamePhase.PATTERN:
-			self.current_player_label.config(text=f"Spieler {self.game.current_player + 1} ist am Zug")
+			current_player_name = self.player_names[self.game.current_player]
+			self.current_player_label.config(text=f"{current_player_name} ist am Zug")
 		else:
 			self.current_player_label.config(text="")
 
@@ -742,10 +756,12 @@ class AzulGUI:
 			dialog.destroy()
 
 		for color in colors:
-			btn = tk.Button(button_frame, width=8, height=2, bg=color.value, fg="black",
-			                text=color.name, font=("Arial", 10, "bold"),
-			                command=lambda c=color: choose_color(c))
-			btn.pack(side=tk.LEFT, padx=5)
+			# Canvas als farbiger Button
+			canvas = tk.Canvas(button_frame, width=80, height=40, 
+			                  bg=color.value, highlightthickness=2, highlightbackground="white")
+			canvas.create_rectangle(2, 2, 78, 38, fill=color.value, outline="black", width=2)
+			canvas.bind("<Button-1>", lambda e, c=color: choose_color(c))
+			canvas.pack(side=tk.LEFT, padx=5)
 
 		dialog.wait_window()
 		return result
@@ -812,9 +828,10 @@ class AzulGUI:
 		winners = [i for i, p in enumerate(self.game.players) if p.score == max_score]
 
 		if len(winners) == 1:
-			winner_text = f"Spieler {winners[0] + 1} gewinnt mit {max_score} Punkten!"
+			winner_name = self.player_names[winners[0]]
+			winner_text = f"{winner_name} gewinnt mit {max_score} Punkten!"
 		else:
-			winner_names = ", ".join(f"Spieler {i + 1}" for i in winners)
+			winner_names = ", ".join(self.player_names[i] for i in winners)
 			winner_text = f"Unentschieden! {winner_names} haben je {max_score} Punkte!"
 
 		# Ergebnis-Dialog
@@ -836,7 +853,8 @@ class AzulGUI:
 		scores_frame.pack(pady=20)
 
 		for i, player in enumerate(self.game.players):
-			tk.Label(scores_frame, text=f"Spieler {i + 1}: {player.score} Punkte",
+			player_name = self.player_names[i]
+			tk.Label(scores_frame, text=f"{player_name}: {player.score} Punkte",
 			         bg="#2C2E3B", fg="white", font=("Arial", 12)).pack()
 
 		tk.Button(dialog, text="Neues Spiel", bg="#4A4C5B", fg="black",
